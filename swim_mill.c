@@ -8,6 +8,7 @@
 // DUE WEDNESDAY 11/30/2016
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <time.h>
 #include <unistd.h>
@@ -17,18 +18,21 @@
 #include <sys/shm.h>
 
 //#include "pellet.c"   // pellets at swim mill positions 1+
-#include "fish.c"     // fish always at swim mill position 0
+//#include "fish.c"     // fish always at swim mill position 0
 
-#define SHM_SIZE 20   // size 20 of shared memory segment
+#define SHM_SIZE 44   // size 11 (fish & 0-10 pellets) of shared memory segment
 
 
-int main(int argc, char** argv){
+int main(){
 
-  char* shmem;              // shared memory array denoting location
+  char *shmem, *s;          // shared memory array denoting location
+  int shmid;
+  int key = 1;              // declares key 
+
   int pCounter;             // ensures <=20 processes in system at any time 
                             // incremented by fork, decremented by wait
-  int key = 1;              // declares key
-  
+
+ 
   char swimMill[99];        // declare visible swim mill
 
   // measure length of computation
@@ -38,16 +42,20 @@ int main(int argc, char** argv){
   endwait = start + duration;
 
   // allocates shared memory segment
-  int shmid = shmget(key, SHM_SIZE, IPC_CREAT);
-
-  if( shmid == -1 ){
+  shmid = shmget(key, SHM_SIZE, IPC_CREAT);
+  if( shmid < 0 ){
     perror("shmget");
     exit(1);
   }
 
   // attaches shared memory segment identified by shmid
   // to the address space of the calling process
-  shmem = (char*) shmat(shmid, 0, 0);
+  if( (shmem = (char*) shmat(shmid, NULL, 0)) == (char *) -1 ){
+    perror("shmat");
+    exit(1);
+  }
+
+  s = shmem;
 
   // fills in swim mill
   int i;
@@ -55,29 +63,33 @@ int main(int argc, char** argv){
     swimMill[i] = '~';
   }
 
-  // print swim mill
-  for( i = 0; i < 100; i++ ){
-    if( i%10 == 0 )
-      printf("\n%c", swimMill[i]);
-
-    else
-      printf("%c", swimMill[i]);
   
-    if(i == 99)
-      printf("\n\n");
-  }
-
   //fish();
-  //pellet(start, endwait);
+  //pellet();
 
   // 30 second computation
-  //while( start < endwait ){
+  while( start < endwait ){
     
     /* Print result to terminal */
 
+    // print swim mill
+    for( i = 0; i < 100; i++ ){
+      if( i%10 == 0 )
+        printf("\n%c", swimMill[i]);
+
+      else
+        printf("%c", swimMill[i]);
+  
+      if(i == 99)
+        printf("\n\n");
+    }
+
+
     /* Write result to file after each child is finished */
   
-  //}
+  }
+
+  //exit(0);
 
 }
 

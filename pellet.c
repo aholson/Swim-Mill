@@ -25,10 +25,13 @@ void *pelletChild(void *ignored){
 
 }
 
-void pellet(time_t start, time_t endwait){
+void pellet(time_t start, time_t endwait, int shmid){
   
   pthread_t child_thread;   // instantiation of thread
   int code;                 // holds any error code that may occur
+
+  // shared memory array
+  char* shmem = (char*) shmat(shmid, 0, 0); 
 
   while( start < endwait ){
 
