@@ -11,14 +11,6 @@
 
 // for solution to no space left on device: bash kill_ipcs.sh
 
-/*
- * TODO
- * - change all execl to execv
- * - print pellet id #, etc.
- * - write to file 
- * - ensure that fish and pellet processes are killed before swim_mill
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -51,10 +43,10 @@ int main(void){
   int key = 5678;           // declares key 
   int shmdtOut;             // holds shmdt output
 
-  int pCounter;             // ensures <=20 processes in system at any time 
-                            // incremented by fork, decremented by wait
-
   char swimMill[99];        // declare visible swim mill
+
+  // file to write swim mill output to
+  FILE *f = fopen("output.txt", "w");
 
   // pids for swim mill parent and fish/pellet child processes
   pid_t parentId = getpid();
@@ -63,7 +55,7 @@ int main(void){
   // measure length of computation
   clock_t endwait;             
   clock_t start = clock();  // returns start time
-  clock_t duration = 15;     // process ends after 30 seconds
+  clock_t duration = 30;     // process ends after 30 seconds
   endwait = start + duration;
 
   // allocates shared memory segment
@@ -80,6 +72,7 @@ int main(void){
     perror("shmat");
     exit(1);
   } 
+  
 
   // ensures that all processes only run for 30 second duration
   shmem[12] = start;
@@ -90,8 +83,6 @@ int main(void){
 
   signal(SIGINT, intHandler);
 
-  //while( keepRunning ){
-
   // fork child process for fish
   fishId = fork();
 
@@ -101,9 +92,6 @@ int main(void){
   }
   
   else if( fishId > 0 ){
-    //printf("hello from fish parent\n");
-    //int status;
-    //waitpid(fishId, &status, 0);
 
     // fork child process for pellet
     pelletId = fork();
@@ -114,10 +102,6 @@ int main(void){
     }
   
     else if( pelletId > 0 ){
-      //printf("hello from pellet parent\n");
-      
-      //int status1;
-      //waitpid(pelletId, &status1, 0);
       
       sleep(2);
 
@@ -139,29 +123,32 @@ int main(void){
 
         // assign fish location based on shared mem
         swimMill[shmem[0]] = 'F';
-        //printf("fishpos: %d\n", shmem[0]);
 
-        // print swim mill
+        // print swim mill && write result to file
         for( i = 0; i < 100; i++ ){  
           
-          if( i%10 == 0 )
+          if( i%10 == 0 ){
             printf("\n%c", swimMill[i]);
-
-          else
-            printf("%c", swimMill[i]);
+            fprintf(f, "\n%c", swimMill[i]);
+          }
   
-          if(i == 99)
+          else{
+            printf("%c", swimMill[i]);
+            fprintf(f, "%c", swimMill[i]);
+          }
+
+          if(i == 99){
             printf("\n\n");
+            fprintf(f, "\n\n");
+          }
         }
 
         sleep(2);
         start++;
-        shmem[12] = start; 
-        /* Write result to file after each child is finished */
-  
+        shmem[12] = start;   
 
-        printf("start: %Lf\n", (long double) start);
-        printf("endwait: %Lf\n", (long double) endwait);
+        //printf("start: %Lf\n", (long double) start);
+        //printf("endwait: %Lf\n", (long double) endwait);
 
       }
 
@@ -169,10 +156,9 @@ int main(void){
     }
 
     else{
-      //printf("hello from child - pellet\n");
-    
+  
       // executes and leaves pellet process
-      int pelletOut = execl("./pellet", "./pellet", NULL);
+      int pelletOut = execl("./pellet", "./pellet", NULL); 
       if( pelletOut == -1 ){
         perror("execl pellet");
         exit(1);
@@ -184,7 +170,6 @@ int main(void){
   }
 
   else{
-    //printf("hello from child - fish\n");
 
     // executes and leaves fish process
     int fishOut = execl("./fish", "./fish", NULL);
@@ -196,9 +181,15 @@ int main(void){
     _exit(EXIT_FAILURE);
   }
 
-  //}
+  fclose(f);
 
-  sleep(2);
+  // all children of coordinator killed
+  kill(fishId, SIGKILL);
+  printf("fish process exited\n");
+
+  kill(pelletId, SIGKILL);
+  printf("pellet process exited\n");
+
   printf("swim mill exited\n");
 
   shmdtOut = shmdt(shmem);

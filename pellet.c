@@ -5,9 +5,6 @@
  * Student ID: 0161753931
  */
 
-// pellets can be threads
-// 5-10 pellets max
-
 // gcc -pthread -o "pellet" pellet.c
 
 #include <stdio.h>
@@ -19,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/syscall.h>
 
 #define PELLET_MIN 5    // min number pellets
 #define PELLET_MAX 10   // max number pellets
@@ -32,56 +30,62 @@ int shmid;
 int key;
 int shmdtOut;       // holds shmdt output
 
-//bool cancel;
+//FILE * file;        // file to log pellet information
 
 void *pelletChild(void *ignored){
  
   int pos;
   int thisPellet = pellet;              // denotes unique pellet
-  //pid_t pid = syscall(SYS_gettid);   // denotes thread id
+  long pid = syscall(SYS_gettid);       // denotes thread id
 
-  // generate random pellet location in first 9 rows
+  // generate random pellet location in first 5 rows
   srand(time(NULL));
-  int r = rand() % 90;
+  int r = rand() % 50;
   
   // ensure pellet does not overlap with another
   int i;
   for( i = 0; i < pellet; i++ ){
     while( r == shmem[i] ){
-      r = rand() % 90;
+      r = rand() % 50;
     }
   }
 
   shmem[thisPellet] = r;
-  shmem[11] = thisPellet;
+  shmem[11] = thisPellet;   // tracks number of pellets
 
-  printf("shmem[%d] = %d\n", thisPellet, shmem[thisPellet]);
-  
   // keep thread running until cancelled
   while( shmem[12] < shmem[13] ){
     sleep(2);
     
-    /* TODO fix so that no overlap with other pellets */
     // if pellet has left range of mill
     if( shmem[thisPellet] > 99 ){
       
       // Each pellet's status printed before exiting
-      /*if( shmem[thisPellet] < 110 ){
+      if( shmem[thisPellet] < 110 ){
         printf("pellet ID: %Lf\n", (long double) pid);
         printf("pellet position: %d\n", shmem[thisPellet]-10);
         printf("pellet status: MISSED\n");
+
+        //fprintf(file, "pellet ID: %Lf\n", (long double) pid);
+        //fprintf(file, "pellet position: %d\n", shmem[thisPellet]-10);
+        //fprintf(file, "pellet status: MISSED\n");
+
       }
       else{
         printf("pellet ID: %Lf\n", (long double) pid);
         printf("pellet position: %d\n", shmem[0]);
         printf("pellet status: EATEN\n");
-      }*/
+
+        //fprintf(file, "pellet ID: %Lf\n", (long double) pid);
+        //fprintf(file, "pellet position: %d\n", shmem[0]);
+        //fprintf(file, "pellet status: EATEN\n");
+      }
 
       // move back to random position
       srand(time(NULL));
       for( i = 0; i < pellet; i++ ){
         while( r == shmem[i] ){
-          r = rand() % 90;
+          r = rand() % 50;
         }
       }
 
@@ -91,9 +95,10 @@ void *pelletChild(void *ignored){
 
     // if next position doesnt overlap with fish
     pos = shmem[thisPellet];
-    if( (pos += 10) != shmem[0] )  
+    if( (pos += 10) != shmem[0] ){  
       // move pellet one row down 
       shmem[thisPellet] += 10;
+    }
     
     else {
       // or move pellet out of range of mill
@@ -108,6 +113,7 @@ void *pelletChild(void *ignored){
 
   } 
 
+  //fclose(file);
 }
 
 int main(){
@@ -115,8 +121,10 @@ int main(){
   pthread_t child_thread;   // instantiation of thread
   int code;                 // holds any error code that may occur
 
-  key = 5678;     // declares key
-  pellet = 1;     // tracks shmem locations of pellet (1-10)
+  key = 5678;               // declares key
+  pellet = 1;               // tracks shmem locations of pellet (1-10)
+
+  //file = fopen("pelletlog.txt", "w+");
 
   // allocates shared memory segment
   if( (shmid = shmget(key, SHM_SIZE, 0666)) < 0 ){
@@ -130,9 +138,6 @@ int main(){
     exit(1);
   }
 
-  // change shared memory to denote pellet positions
-  printf("%s", "hello from pellet\n");
-
   // parent thread creates up to 10 child threads
   while( (pellet <= PELLET_MAX) && (shmem[12] < shmem[13])){
     
@@ -145,26 +150,17 @@ int main(){
                 // 30 should divide by this number evenly
     pellet++;
 
-    // send thread cancellation request
-    //if( cancel ){
-    //}
   }
-
-  // keep process running until cancelled
-  //while( shmem[12] < shmem[13] ){
-    //printf("shmem[12]: %Lf\n", (long double) shmem[12]);
-    //printf("shmem[13]: %Lf\n", (long double) shmem[13]);
-    //sleep(1);
-  //}
 
   printf("# pellets caught: %d\n", shmem[14]);
 
+  // shared memory deallocated
   shmdtOut = shmdt(shmem);
   if( shmdtOut == -1 ){
     perror("shmdt");
     exit(1);
   }  
-
+  
   exit(0);
 }
 

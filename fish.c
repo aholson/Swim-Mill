@@ -20,22 +20,22 @@
 
 int main(){
 
-  int *shmem;  	  // shared memory array denoting location
+  int *shmem;       // shared memory array denoting location
   int shmid;
-  int key = 5678; // declares key
-  int shmdtOut;   // holds shmdt output
+  int key = 5678;   // declares key
+  int shmdtOut;     // holds shmdt output
 
   int i;            // for loop iteration
   int closest;      // denotes mem of closest pellet to fish
   int fishColumn;
 
-  int pellColumn;
+  int pellColumn;   // column and row of current pellet
   int pellRow;
-  int pellDist;     // relative displacement from fish
+  int pellDist;     // current's relative displacement from fish
   
-  int closestColumn;
+  int closestColumn;// column and row of closest pellet
   int closestRow;
-  int closestDist;
+  int closestDist;  // closest's relative displacement from fish
 
   // allocates shared memory segment
   if( (shmid = shmget(key, SHM_SIZE, 0666)) < 0 ){
@@ -51,18 +51,14 @@ int main(){
 
   // change shared memory to denote fish's position
   // (locations 90-99 denoted bottom row)
-  printf("%s", "hello from fish\n");
   shmem[0] = 94;
-  
   closest = 1;  
-  //printf("%s = %d\n", "fish shmem (fish) ", shmem[0]);
 
   // keeps fish running for duration of timer
   while( shmem[12] < shmem[13] ){
     
     fishColumn = shmem[0]%10;
     
-
     // scan shmem and direct fish to column of closest pellet
     for( i = 1; i <= shmem[11]; i++ ){
       
@@ -121,11 +117,12 @@ int main(){
     else if( closestColumn < fishColumn )
       shmem[0]--;
 
-    //printf("closestColumn: %d\n", closestColumn);
     sleep(2);
   }
 
   printf("fish exited\n");
+  
+  // deallocate shared memory
   shmdtOut = shmdt(shmem);
   if( shmdtOut == -1 ){
     perror("shmdt");
